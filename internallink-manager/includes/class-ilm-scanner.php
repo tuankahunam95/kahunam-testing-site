@@ -211,4 +211,79 @@ class ILM_Scanner {
 
         return $content;
     }
+
+    /**
+     * Generate comprehensive report for orphaned pages
+     */
+    public static function generate_report() {
+        global $wpdb;
+
+        $orphaned_pages = self::get_orphaned_pages(1000);
+        $report_data = array();
+
+        foreach ($orphaned_pages as $page) {
+            $suggestions_count = ILM_Analyzer::get_suggestions_count($page->post_id, 'all');
+            $pending_count = ILM_Analyzer::get_suggestions_count($page->post_id, 'pending');
+            $accepted_count = ILM_Analyzer::get_suggestions_count($page->post_id, 'accepted');
+
+            $report_data[] = array(
+                'post_id' => $page->post_id,
+                'title' => $page->post_title,
+                'url' => get_permalink($page->post_id),
+                'post_type' => $page->post_type,
+                'published_date' => $page->post_date,
+                'total_suggestions' => $suggestions_count,
+                'pending_suggestions' => $pending_count,
+                'accepted_suggestions' => $accepted_count,
+                'status' => ($pending_count > 0) ? 'Has Suggestions' : 'Needs Analysis',
+            );
+        }
+
+        return $report_data;
+    }
+
+    /**
+     * Export report as CSV
+     */
+    public static function export_report_csv() {
+        $report_data = self::generate_report();
+
+        // Set headers for CSV download
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename=orphaned-pages-report-' . date('Y-m-d') . '.csv');
+
+        // Create output stream
+        $output = fopen('php://output', 'w');
+
+        // Add CSV headers
+        fputcsv($output, array(
+            'Post ID',
+            'Title',
+            'URL',
+            'Post Type',
+            'Published Date',
+            'Total Suggestions',
+            'Pending Suggestions',
+            'Accepted Suggestions',
+            'Status'
+        ));
+
+        // Add data rows
+        foreach ($report_data as $row) {
+            fputcsv($output, array(
+                $row['post_id'],
+                $row['title'],
+                $row['url'],
+                $row['post_type'],
+                $row['published_date'],
+                $row['total_suggestions'],
+                $row['pending_suggestions'],
+                $row['accepted_suggestions'],
+                $row['status']
+            ));
+        }
+
+        fclose($output);
+        exit;
+    }
 }

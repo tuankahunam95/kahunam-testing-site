@@ -156,6 +156,7 @@ class ILM_Analyzer {
         $sentence_lower = strtolower($sentence);
         $score = 0;
         $matched_keywords = array();
+        $best_anchor = '';
 
         // Check for exact title match (highest score)
         if (stripos($sentence, $target_title) !== false) {
@@ -165,48 +166,150 @@ class ILM_Analyzer {
             );
         }
 
-        // Check for keyword matches
+        // Try to find partial title phrases (very high relevance)
+        $title_phrases = self::extract_title_phrases($target_title, $sentence);
+        if (!empty($title_phrases)) {
+            $longest_phrase = reset($title_phrases);
+            $word_count = count(explode(' ', $longest_phrase));
+
+            // Score based on phrase length: 2+ words = 80-95 points
+            $phrase_score = min(95, 70 + ($word_count * 8));
+
+            return array(
+                'score' => $phrase_score,
+                'anchor_text' => $longest_phrase,
+            );
+        }
+
+        // Check for keyword matches and extract contextual phrases
         foreach ($keywords as $index => $keyword) {
             if (stripos($sentence_lower, $keyword) !== false) {
                 // Weight decreases for lower-ranked keywords
-                $weight = max(10, 50 - ($index * 2));
+                $weight = max(15, 60 - ($index * 3));
                 $score += $weight;
                 $matched_keywords[] = $keyword;
 
-                if (count($matched_keywords) >= 3) {
-                    break; // Don't over-count
+                // Extract contextual phrase around the keyword
+                if (empty($best_anchor)) {
+                    $best_anchor = self::extract_contextual_phrase($sentence, $keyword);
+                }
+
+                if (count($matched_keywords) >= 2) {
+                    break; // Limit to avoid over-matching
                 }
             }
         }
 
-        // Determine best anchor text
-        $anchor_text = '';
-        if (!empty($matched_keywords)) {
-            // Try to find the longest matching phrase
-            $anchor_text = $matched_keywords[0];
+        // If we didn't find a good phrase, try to use the most relevant keyword
+        if (empty($best_anchor) && !empty($matched_keywords)) {
+            $best_anchor = $matched_keywords[0];
+        }
 
-            // Check if we can use a phrase from the title
-            $title_words = explode(' ', strtolower($target_title));
-            foreach ($title_words as $i => $word) {
-                if (strlen($word) < 3) continue;
-
-                if (stripos($sentence_lower, $word) !== false) {
-                    // Try to extract a 2-3 word phrase
-                    $phrase_length = min(3, count($title_words) - $i);
-                    $phrase = implode(' ', array_slice($title_words, $i, $phrase_length));
-
-                    if (stripos($sentence_lower, $phrase) !== false) {
-                        $anchor_text = $phrase;
-                        break;
-                    }
-                }
-            }
+        // Boost score if multiple keywords match
+        if (count($matched_keywords) > 1) {
+            $score = min(100, $score * 1.3);
         }
 
         return array(
             'score' => min(100, $score),
-            'anchor_text' => $anchor_text,
+            'anchor_text' => $best_anchor,
         );
+    }
+
+    /**
+     * Extract phrases from title that appear in the sentence
+     */
+    private static function extract_title_phrases($title, $sentence) {
+        $title_words = preg_split('/\s+/', strtolower($title));
+        $sentence_lower = strtolower($sentence);
+        $found_phrases = array();
+
+        // Try to find phrases of 2-5 words from the title
+        for ($length = 5; $length >= 2; $length--) {
+            for ($i = 0; $i <= count($title_words) - $length; $i++) {
+                $phrase = implode(' ', array_slice($title_words, $i, $length));
+
+                // Skip if phrase contains only short words
+                $words_in_phrase = explode(' ', $phrase);
+                $has_meaningful_word = false;
+                foreach ($words_in_phrase as $word) {
+                    if (strlen($word) > 3) {
+                        $has_meaningful_word = true;
+                        break;
+                    }
+                }
+
+                if (!$has_meaningful_word) {
+                    continue;
+                }
+
+                if (stripos($sentence_lower, $phrase) !== false) {
+                    $found_phrases[] = $phrase;
+                    return $found_phrases; // Return first (longest) match
+                }
+            }
+        }
+
+        return $found_phrases;
+    }
+
+    /**
+     * Extract a contextual phrase around a keyword
+     */
+    private static function extract_contextual_phrase($sentence, $keyword) {
+        $sentence_lower = strtolower($sentence);
+        $keyword_lower = strtolower($keyword);
+
+        // Find the position of the keyword
+        $pos = stripos($sentence_lower, $keyword_lower);
+        if ($pos === false) {
+            return $keyword;
+        }
+
+        // Split sentence into words
+        $words = preg_split('/\s+/', $sentence, -1, PREG_SPLIT_NO_EMPTY | PREG_SPLIT_OFFSET_CAPTURE);
+
+        // Find which word contains the keyword
+        $keyword_word_index = -1;
+        foreach ($words as $index => $word_data) {
+            $word_pos = $word_data[1];
+            $word_text = $word_data[0];
+
+            if ($word_pos <= $pos && $pos < $word_pos + strlen($word_text)) {
+                $keyword_word_index = $index;
+                break;
+            }
+        }
+
+        if ($keyword_word_index === -1) {
+            return $keyword;
+        }
+
+        // Extract 2-4 words around the keyword
+        $start_index = max(0, $keyword_word_index - 1);
+        $end_index = min(count($words) - 1, $keyword_word_index + 2);
+
+        // Build the phrase
+        $phrase_words = array();
+        for ($i = $start_index; $i <= $end_index; $i++) {
+            $word = $words[$i][0];
+            // Clean up punctuation
+            $word = preg_replace('/[^\w\s-]/', '', $word);
+            if (!empty($word)) {
+                $phrase_words[] = $word;
+            }
+        }
+
+        $phrase = implode(' ', $phrase_words);
+
+        // Ensure phrase is not too long
+        if (str_word_count($phrase) > 5) {
+            // Trim to 4-5 words centered on keyword
+            $phrase_words = array_slice($phrase_words, 0, 5);
+            $phrase = implode(' ', $phrase_words);
+        }
+
+        return !empty($phrase) ? $phrase : $keyword;
     }
 
     /**
