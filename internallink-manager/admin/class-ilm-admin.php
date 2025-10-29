@@ -23,6 +23,23 @@ class ILM_Admin {
     public function __construct($plugin_name, $version) {
         $this->plugin_name = $plugin_name;
         $this->version = $version;
+
+        // Handle export report action
+        add_action('admin_init', array($this, 'handle_export_report'));
+    }
+
+    /**
+     * Handle export report request
+     */
+    public function handle_export_report() {
+        if (isset($_GET['ilm_export_report']) && $_GET['ilm_export_report'] === '1') {
+            if (!current_user_can('manage_options')) {
+                wp_die('Unauthorized');
+            }
+
+            check_admin_referer('ilm_export_report');
+            ILM_Scanner::export_report_csv();
+        }
     }
 
     /**

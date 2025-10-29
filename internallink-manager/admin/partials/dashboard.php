@@ -30,6 +30,11 @@ $total_orphaned = ILM_Scanner::get_orphaned_pages_count();
         <a href="<?php echo admin_url('admin.php?page=ilm-scan'); ?>" class="button button-primary">
             Scan Site Now
         </a>
+        <?php if ($total_orphaned > 0): ?>
+            <a href="<?php echo wp_nonce_url(admin_url('admin.php?ilm_export_report=1'), 'ilm_export_report'); ?>" class="button">
+                Export Report (CSV)
+            </a>
+        <?php endif; ?>
     </div>
 
     <h2>Orphaned Pages</h2>

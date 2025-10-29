@@ -57,8 +57,8 @@ class ILM_Activator {
         // Set default options
         $default_settings = array(
             'post_types' => array('post', 'page'),
-            'min_relevance_score' => 50,
-            'max_suggestions_per_page' => 10,
+            'min_relevance_score' => 60,
+            'max_suggestions_per_page' => 5,
             'batch_size' => 20,
             'exclude_high_link_density' => true,
             'link_density_threshold' => 5, // max 5% link density
