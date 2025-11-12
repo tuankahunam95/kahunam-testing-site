@@ -286,4 +286,94 @@ class ILM_Scanner {
         fclose($output);
         exit;
     }
+
+    /**
+     * Export report as PDF
+     */
+    public static function export_report_pdf() {
+        $report_data = self::generate_report();
+
+        // Include TCPDF library
+        require_once(ILM_PLUGIN_DIR . 'includes/tcpdf/tcpdf.php');
+
+        // Create new PDF document
+        $pdf = new TCPDF('L', 'mm', 'A4', true, 'UTF-8', false);
+
+        // Set document information
+        $pdf->SetCreator('InternalLink Manager');
+        $pdf->SetAuthor('InternalLink Manager');
+        $pdf->SetTitle('Orphaned Pages Report');
+        $pdf->SetSubject('WordPress Internal Linking Report');
+
+        // Remove default header/footer
+        $pdf->setPrintHeader(false);
+        $pdf->setPrintFooter(false);
+
+        // Set margins
+        $pdf->SetMargins(10, 10, 10);
+        $pdf->SetAutoPageBreak(true, 10);
+
+        // Add a page
+        $pdf->AddPage();
+
+        // Set font
+        $pdf->SetFont('helvetica', 'B', 16);
+
+        // Title
+        $pdf->Cell(0, 10, 'Orphaned Pages Report', 0, 1, 'C');
+        $pdf->SetFont('helvetica', '', 10);
+        $pdf->Cell(0, 5, 'Generated on: ' . date('Y-m-d H:i:s'), 0, 1, 'C');
+        $pdf->Ln(5);
+
+        // Table header
+        $pdf->SetFont('helvetica', 'B', 9);
+        $pdf->SetFillColor(0, 115, 170);
+        $pdf->SetTextColor(255, 255, 255);
+
+        // Column widths (total should be ~277mm for A4 landscape with margins)
+        $w = array(15, 60, 60, 25, 30, 22, 22, 22, 21);
+
+        $pdf->Cell($w[0], 7, 'ID', 1, 0, 'C', true);
+        $pdf->Cell($w[1], 7, 'Title', 1, 0, 'C', true);
+        $pdf->Cell($w[2], 7, 'URL', 1, 0, 'C', true);
+        $pdf->Cell($w[3], 7, 'Type', 1, 0, 'C', true);
+        $pdf->Cell($w[4], 7, 'Published Date', 1, 0, 'C', true);
+        $pdf->Cell($w[5], 7, 'Total Sug.', 1, 0, 'C', true);
+        $pdf->Cell($w[6], 7, 'Pending', 1, 0, 'C', true);
+        $pdf->Cell($w[7], 7, 'Accepted', 1, 0, 'C', true);
+        $pdf->Cell($w[8], 7, 'Status', 1, 1, 'C', true);
+
+        // Table data
+        $pdf->SetFont('helvetica', '', 8);
+        $pdf->SetTextColor(0, 0, 0);
+
+        $fill = false;
+        foreach ($report_data as $row) {
+            $pdf->SetFillColor(249, 249, 249);
+
+            // Get current Y position before row
+            $start_y = $pdf->GetY();
+
+            // Calculate row height (use MultiCell to handle long text)
+            $title = substr($row['title'], 0, 80); // Limit title length
+            $url = substr($row['url'], 0, 80); // Limit URL length
+
+            $pdf->Cell($w[0], 6, $row['post_id'], 1, 0, 'C', $fill);
+            $pdf->Cell($w[1], 6, $title, 1, 0, 'L', $fill);
+            $pdf->Cell($w[2], 6, $url, 1, 0, 'L', $fill);
+            $pdf->Cell($w[3], 6, ucfirst($row['post_type']), 1, 0, 'C', $fill);
+            $pdf->Cell($w[4], 6, date('Y-m-d', strtotime($row['published_date'])), 1, 0, 'C', $fill);
+            $pdf->Cell($w[5], 6, $row['total_suggestions'], 1, 0, 'C', $fill);
+            $pdf->Cell($w[6], 6, $row['pending_suggestions'], 1, 0, 'C', $fill);
+            $pdf->Cell($w[7], 6, $row['accepted_suggestions'], 1, 0, 'C', $fill);
+            $pdf->Cell($w[8], 6, $row['status'], 1, 1, 'C', $fill);
+
+            $fill = !$fill;
+        }
+
+        // Output PDF
+        $filename = 'orphaned-pages-report-' . date('Y-m-d') . '.pdf';
+        $pdf->Output($filename, 'D');
+        exit;
+    }
 }

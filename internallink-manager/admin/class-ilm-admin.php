@@ -26,6 +26,7 @@ class ILM_Admin {
 
         // Handle export report action
         add_action('admin_init', array($this, 'handle_export_report'));
+        add_action('admin_init', array($this, 'handle_export_report_pdf'));
     }
 
     /**
@@ -39,6 +40,20 @@ class ILM_Admin {
 
             check_admin_referer('ilm_export_report');
             ILM_Scanner::export_report_csv();
+        }
+    }
+
+    /**
+     * Handle PDF export report request
+     */
+    public function handle_export_report_pdf() {
+        if (isset($_GET['ilm_export_report_pdf']) && $_GET['ilm_export_report_pdf'] === '1') {
+            if (!current_user_can('manage_options')) {
+                wp_die('Unauthorized');
+            }
+
+            check_admin_referer('ilm_export_report_pdf');
+            ILM_Scanner::export_report_pdf();
         }
     }
 

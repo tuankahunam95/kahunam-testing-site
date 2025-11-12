@@ -34,6 +34,9 @@ $total_orphaned = ILM_Scanner::get_orphaned_pages_count();
             <a href="<?php echo wp_nonce_url(admin_url('admin.php?ilm_export_report=1'), 'ilm_export_report'); ?>" class="button">
                 Export Report (CSV)
             </a>
+            <a href="<?php echo wp_nonce_url(admin_url('admin.php?ilm_export_report_pdf=1'), 'ilm_export_report_pdf'); ?>" class="button">
+                Export Report (PDF)
+            </a>
         <?php endif; ?>
     </div>
 
